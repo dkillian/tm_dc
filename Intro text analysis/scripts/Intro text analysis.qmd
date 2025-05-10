@@ -1,0 +1,97 @@
+---
+title: "Intro text analysis"
+subtitle: "Datacamp text mining track"
+date: May 2025
+toc: true
+toc-depth: 4
+number-sections: false
+format:
+  html:
+    code-fold: false
+    page-layout: full
+editor: visual
+reference-location: margin
+---
+
+```{r global_options, include=F, warning=F, message=F, echo=F, error=F}
+library(here)
+library(knitr)
+source("../scripts/prep.r")
+```
+
+
+# Chapter 1
+
+```{r}
+room <- read_csv("Intro text analysis/data/Roomba Reviews.csv")
+head(room) %>%
+    flextable()
+```
+```{r}
+frq(room$Product)
+```
+```{r}
+room %>%
+    filter(Product=="iRobot Roomba 650 for Pets") %>%
+    summarise(stars_mean=mean(Stars, na.rm=T))
+```
+
+
+```{r}
+room %>%
+    group_by(Product) %>%
+    summarise(stars=mean(Stars))
+```
+
+
+```{r}
+room %>%
+    count(Product)
+```
+
+```{r}
+library(tidytext)
+room_tk <- room %>%
+    unnest_tokens(word, Review)
+room_tk
+```
+
+
+
+```{r}
+room_tk %>%
+    count(word) %>%
+    arrange(desc(n))
+```
+
+```{r}
+head(stop_words)
+```
+
+```{r}
+room_tk2 <- room %>%
+    unnest_tokens(word, Review) %>%
+    anti_join(stop_words)
+
+head(room_tk2)
+    
+```
+
+```{r}
+room_tk2 %>%
+    count(word) %>%
+    arrange(desc(n))
+```
+
+
+```{r}
+twt <- read_rds("Intro text analysis/data/ch_1_twitter_data.rds")
+head(twt)
+```
+
+```{r}
+twt %>%
+    count(complaint_label)
+```
+
+
