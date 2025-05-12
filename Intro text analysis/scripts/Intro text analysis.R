@@ -8,7 +8,8 @@ library(tidytext)
 
 # roomba reviews ---- 
 
-room <- read_csv("Intro text analysis/data/Roomba Reviews.csv")
+room <- read_csv("Intro text analysis/data/Roomba Reviews.csv") %>%
+    mutate(id=1:nrow(room))
 
 head(room)
 frq(room$Product)
@@ -34,11 +35,11 @@ room_tk %>%
 
 head(stop_words)
 
-room_tk2 <- room %>%
+room_tk <- room %>%
     unnest_tokens(word, Review) %>%
-    anti_join(stop_words)
+    anti_join(stop_words2)
 
-head(room_tk2)
+head(room_tk)
 
 room_tk2 %>%
     count(word) %>%
@@ -234,6 +235,128 @@ ggplot(word_cnts, aes(n, fct_reorder(word2, n), fill=sentiment)) +
                scales="free_y") +
     faceted
 
+# improving sentiment analysis ---- 
+
+head(room_tk)
+
+sent_stars <- room_tk %>%
+    inner_join(get_sentiments("bing")) %>%
+    count(Stars, sentiment) %>%
+    pivot_wider(names_from=sentiment,
+                values_from=n) %>%
+    mutate(sent=positive-negative,
+           stars=fct_reorder(as_character(Stars), sent))
+
+sent_stars
+
+ggplot(sent_stars, aes(sent, stars, fill=stars)) +
+    geom_col()
+
+twt_tk %>% 
+    # Append the afinn sentiment dictionary
+    inner_join(get_sentiments("afinn")) %>% 
+    # Group by both complaint label and whether or not the user is verified
+    group_by(complaint_label, usr_verified) %>% 
+    # Summarize the data with an aggregate_value = sum(value)
+    summarise(aggregate_value = sum(value)) %>% 
+    # Spread the complaint_label and aggregate_value columns
+    pivot_wider(names_from = complaint_label, values_from = aggregate_value) %>% 
+    mutate(overall_sentiment = Complaint + `Non-Complaint`)
+
+# CHAPTER 4 ----
+
+# Latent Dirichlet Allocation ---- 
+
+room_tk <- room_tk %>%
+    mutate(id=1:nrow(room_tk))
+
+head(room_tk)
+
+room_tk %>%
+    count(word, id) %>%
+    arrange(desc(n))
+
+
+?cast_dtm
+
+room_dtm <- room_tk %>%
+    count(word, id) %>% 
+    cast_dtm(id, word, n) %>%
+    as.matrix()
+
+room_dtm[1:4,1000:1004]
+
+library(topicmodels)
+
+room_lda <- LDA(room_dtm,
+               k=2,
+               method="Gibbs",
+               control=list(seed=42))
+
+room_lda
+summary(room_lda)
+glimpse(room_lda)
+
+room_topics <- lda_out %>%
+    tidy(matrix="beta")
+
+room_topics %>%
+    arrange(desc(beta))
+
+room_topics %>%
+    group_by(topic) %>%
+    summarise(sum=sum(beta),
+              n=n())
+
+room_probs <- room_topics %>%
+    group_by(topic) %>%
+    slice_max(beta, n=10) %>%
+    arrange(desc(beta)) %>%
+    ungroup() %>%
+    mutate(term2=fct_reorder(term, beta))
+
+room_probs
+
+ggplot(room_probs, aes(beta, term2)) + 
+    geom_col(width=.5,
+             fill="dodgerblue2",
+             alpha=.6) +
+    facet_wrap(~topic,
+               scales="free_y") +
+    labs(title="Top words in each topic",
+         x="Probability",
+         y="Word") +
+    theme(axis.title.y=element_text(angle=0, vjust=.5)) +
+    faceted
+
+# Run an LDA with 3 topics and a Gibbs sampler
+room_lda2 <- LDA(
+    room_dtm,
+    k=3,
+    method="Gibbs",
+    control = list(seed = 42)) 
+
+head(room_lda2)
+glimpse(room_lda2)
+
+# Tidy the matrix of word probabilities
+room_topics2 <- room_lda2 %>% 
+    tidy(matrix="beta")
+
+room_probs2 <- room_topics2 %>%
+    group_by(topic) %>%
+    slice_max(beta, n=15) %>%
+    #ungroup() %>%
+    mutate(term2=fct_reorder(term, beta)) %>%
+    arrange(desc(beta))
+
+room_probs2
+
+ggplot(room_probs2, aes(beta, fct_reorder(term, beta), fill=topic)) +
+    geom_col() +
+    facet_wrap(~topic,
+               scales="free") +
+    faceted
 
 
 
